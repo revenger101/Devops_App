@@ -1,0 +1,14 @@
+# Test profile: no config server, no eureka, in-memory database.
+spring:
+  config:
+    import: ""
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    url: jdbc:h2:mem:product_test;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+eureka:
+  client:
+    enabled: false
