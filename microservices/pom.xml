@@ -23,6 +23,7 @@
 		<module>api-gateway</module>
 		<module>product-service</module>
 		<module>supplier-service</module>
+		<module>invoice-service</module>
 	</modules>
 
 	<properties>
