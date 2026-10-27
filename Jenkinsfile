@@ -20,8 +20,11 @@ pipeline {
     stage('SonarQube analysis') {
       steps {
         dir('microservices') {
-          withSonarQubeEnv('sonarqube') {
-            sh 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.1.2184:sonar -Dsonar.projectKey=achat-microservices -Dsonar.projectName=achat-microservices'
+          // The scanner needs Java 11+; the project itself still builds on jdk8 above.
+          withEnv(['JAVA_HOME=/opt/java/openjdk']) {
+            withSonarQubeEnv('sonarqube') {
+              sh 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.1.2184:sonar -Dsonar.projectKey=achat-microservices -Dsonar.projectName=achat-microservices'
+            }
           }
         }
       }
