@@ -22,6 +22,7 @@
 		<module>auth-service</module>
 		<module>api-gateway</module>
 		<module>product-service</module>
+		<module>supplier-service</module>
 	</modules>
 
 	<properties>

@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: supplier-service
+  config:
+    import: "configserver:${CONFIG_URL:http://localhost:8888}"
