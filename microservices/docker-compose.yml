@@ -1,0 +1,176 @@
+# Usage:  cp .env.example .env  (fill it in)  &&  docker compose up -d --build
+# Only the gateway (8080) and the Eureka dashboard (8761, localhost only) are reachable from the host.
+
+x-service: &service
+  restart: unless-stopped
+  networks: [achat-net]
+  environment: &service-env
+    CONFIG_URL: http://config-server:8888
+    EUREKA_URL: http://discovery-server:8761/eureka
+    MYSQL_HOST: mysql
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    networks: [achat-net]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?set AUTH_DB_PASSWORD in .env}
+      PRODUCT_DB_PASSWORD: ${PRODUCT_DB_PASSWORD:?set PRODUCT_DB_PASSWORD in .env}
+      SUPPLIER_DB_PASSWORD: ${SUPPLIER_DB_PASSWORD:?set SUPPLIER_DB_PASSWORD in .env}
+      INVOICE_DB_PASSWORD: ${INVOICE_DB_PASSWORD:?set INVOICE_DB_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  discovery-server:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: discovery-server
+    image: achat/discovery-server:1.0
+    environment:
+      EUREKA_HOSTNAME: discovery-server
+    ports:
+      - "127.0.0.1:8761:8761"
+    healthcheck: &health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  config-server:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: config-server
+    image: achat/config-server:1.0
+    environment:
+      <<: *service-env
+      CONFIG_REPO_PATH: file:/config-repo
+    volumes:
+      - ./config-repo:/config-repo:ro
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q UP"]
+
+  api-gateway:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: api-gateway
+    image: achat/api-gateway:1.0
+    environment:
+      <<: *service-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (min 32 chars)}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+    ports:
+      - "8080:8080"
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+
+  auth-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: auth-service
+    image: achat/auth-service:1.0
+    environment:
+      <<: *service-env
+      DB_USER: auth
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (min 32 chars)}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+
+  product-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: product-service
+    image: achat/product-service:1.0
+    environment:
+      <<: *service-env
+      DB_USER: product
+      DB_PASSWORD: ${PRODUCT_DB_PASSWORD}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
+
+  supplier-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: supplier-service
+    image: achat/supplier-service:1.0
+    environment:
+      <<: *service-env
+      DB_USER: supplier
+      DB_PASSWORD: ${SUPPLIER_DB_PASSWORD}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP"]
+
+  invoice-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: invoice-service
+    image: achat/invoice-service:1.0
+    environment:
+      <<: *service-env
+      DB_USER: invoice
+      DB_PASSWORD: ${INVOICE_DB_PASSWORD}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q UP"]
+
+networks:
+  achat-net:
+
+volumes:
+  mysql-data:
