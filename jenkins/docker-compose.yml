@@ -39,7 +39,19 @@ services:
     volumes:
       - sonar-db-data:/var/lib/postgresql/data
 
+  nexus:
+    image: sonatype/nexus3:3.70.1
+    container_name: nexus
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      INSTALL4J_ADD_VM_PARAMS: -Xms512m -Xmx1g -XX:MaxDirectMemorySize=1g
+    volumes:
+      - nexus-data:/nexus-data
+
 volumes:
+  nexus-data:
   jenkins-data:
   sonar-data:
   sonar-extensions:

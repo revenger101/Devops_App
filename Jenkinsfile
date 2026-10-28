@@ -37,5 +37,18 @@ pipeline {
         }
       }
     }
+
+    stage('Publish to Nexus') {
+      when { anyOf { branch 'dev'; branch 'feature/ci-nexus' } }
+      steps {
+        dir('microservices') {
+          withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+            // One immutable release per build: 1.0.<build number>
+            sh 'mvn -B versions:set -DnewVersion=1.0.${BUILD_NUMBER} -DgenerateBackupPoms=false'
+            sh 'mvn -B -s ci/settings.xml deploy -DskipTests'
+          }
+        }
+      }
+    }
   }
 }

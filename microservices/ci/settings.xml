@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Used by the Jenkins pipeline only: mvn -s ci/settings.xml deploy. Credentials come from the environment. -->
+<settings>
+	<servers>
+		<server>
+			<id>nexus-releases</id>
+			<username>${env.NEXUS_USER}</username>
+			<password>${env.NEXUS_PASS}</password>
+		</server>
+	</servers>
+</settings>
